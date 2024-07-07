@@ -1,13 +1,12 @@
 import {
-  Column,
-  CreateDateColumn,
   Entity,
-  OneToMany,
+  Column,
   PrimaryGeneratedColumn,
+  OneToMany,
+  CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Max, Min } from '@nestjs/class-validator';
-import { IsEmail } from 'class-validator';
+import { Length, IsEmail, IsNotEmpty, IsEmpty, IsDate } from 'class-validator';
 import { Wish } from '../../wishes/entities/wish.entity';
 import { Offer } from '../../offers/entities/offer.entity';
 import { Wishlist } from '../../wishlists/entities/wishlist.entity';
@@ -18,60 +17,44 @@ export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({
-    type: 'varchar',
-    unique: true,
-  })
-  @Min(2)
-  @Max(30)
+  @Column({ unique: true, nullable: false })
+  @Length(2, 30)
   username: string;
 
-  @Column({
-    default: 'Пока ничего не рассказал о себе',
-  })
-  @Min(2)
-  @Max(200)
+  @Column({ default: 'Пока ничего не рассказал о себе' })
+  @Length(2, 200)
   about: string;
 
-  @Column({
-    default: 'https://i.pravatar.cc/300',
-  })
+  @Column({ default: 'https://i.pravatar.cc/300' })
   avatar: string;
 
-  @Column({
-    unique: true,
-  })
+  @Exclude()
+  @Column({ unique: true, select: false })
   @IsEmail()
+  @IsNotEmpty()
   email: string;
 
-  @Column()
   @Exclude()
+  @Column({ select: false })
+  @IsNotEmpty()
   password: string;
 
-  @Column({
-    type: 'varchar',
-    nullable: true,
-  })
   @OneToMany(() => Wish, (wish) => wish.owner)
   wishes: Wish[];
 
-  @Column({
-    type: 'varchar',
-    nullable: true,
-  })
   @OneToMany(() => Offer, (offer) => offer.user)
   offers: Offer[];
 
-  @Column({
-    type: 'varchar',
-    nullable: true,
-  })
-  @OneToMany(() => Wishlist, (wishlist) => wishlist.items)
-  wishlists: string;
+  @OneToMany(() => Wishlist, (wishlist) => wishlist.owner)
+  wishlists: Wishlist[];
 
+  @IsEmpty()
   @CreateDateColumn()
+  @IsDate()
   createdAt: Date;
 
+  @IsEmpty()
   @UpdateDateColumn()
+  @IsDate()
   updatedAt: Date;
 }

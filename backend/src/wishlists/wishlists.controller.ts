@@ -1,50 +1,71 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
-  Req,
+  ForbiddenException,
+  Get,
+  Param,
+  Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
+import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { WishlistsService } from './wishlists.service';
 import { CreateWishlistDto } from './dto/create-wishlist.dto';
+import { User } from 'src/users/entities/user.entity';
+import { AuthUser } from 'src/common/decorators/user.decorator';
 import { UpdateWishlistDto } from './dto/update-wishlist.dto';
-import { AuthGuard } from '@nestjs/passport';
+import { Wishlist } from './entities/wishlist.entity';
 
-@Controller('wishlists')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(JwtAuthGuard)
+@Controller('wishlistlists')
 export class WishlistsController {
   constructor(private readonly wishlistsService: WishlistsService) {}
 
   @Post()
-  create(@Body() createWishlistDto: CreateWishlistDto, @Req() req) {
-    return this.wishlistsService.create(createWishlistDto, req.user.id);
+  async create(
+    @Body() createWishlistDto: CreateWishlistDto,
+    @AuthUser() user: User,
+  ) {
+    return this.wishlistsService.create(createWishlistDto, user);
   }
 
   @Get()
-  findAll() {
-    return this.wishlistsService.findAll();
+  async findAll() {
+    return this.wishlistsService.findAll({ relations: ['owner', 'items'] });
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.wishlistsService.findOne(+id);
+  async findOne(@Param('id') id: number) {
+    return this.wishlistsService.findOne({
+      where: { id },
+      relations: ['owner', 'items'],
+    });
   }
 
   @Patch(':id')
-  update(
-    @Param('id') id: string,
+  async update(
+    @Param('id') id: number,
     @Body() updateWishlistDto: UpdateWishlistDto,
-    @Req() req,
+    @AuthUser() user: User,
   ) {
-    return this.wishlistsService.update(+id, updateWishlistDto, req.user.id);
+    const wishlist = await this.findOne(id);
+
+    if (wishlist.owner.id !== user.id) {
+      throw new ForbiddenException('Можно редактировать только свои вишлисты');
+    }
+
+    return this.wishlistsService.updateOne({ id }, updateWishlistDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() req) {
-    return this.wishlistsService.remove(+id, req.user.id);
+  async remove(
+    @Param('id') id: number,
+    @AuthUser() user: User,
+  ): Promise<Wishlist> {
+    return this.wishlistsService.remove(
+      { where: { id }, relations: ['owner'] },
+      user,
+    );
   }
 }

@@ -1,16 +1,16 @@
 import {
-  Column,
-  CreateDateColumn,
   Entity,
-  ManyToMany,
-  ManyToOne,
+  Column,
   PrimaryGeneratedColumn,
+  ManyToMany,
+  CreateDateColumn,
   UpdateDateColumn,
+  JoinTable,
+  ManyToOne,
 } from 'typeorm';
-import { IsUrl } from '@nestjs/class-validator';
+import { Length } from 'class-validator';
 import { User } from '../../users/entities/user.entity';
 import { Wish } from '../../wishes/entities/wish.entity';
-import { IsOptional, Length } from 'class-validator';
 
 @Entity()
 export class Wishlist {
@@ -22,18 +22,13 @@ export class Wishlist {
   name: string;
 
   @Column()
-  @Length(1, 1500)
-  @IsOptional()
-  description: string;
-
-  @Column()
-  @IsUrl()
   image: string;
 
-  @Column({
-    type: 'varchar',
-  })
-  @ManyToMany(() => Wish, (wish) => wish.wishlist)
+  @ManyToOne(() => User, (user) => user.wishlists)
+  owner: User;
+
+  @ManyToMany(() => Wish)
+  @JoinTable()
   items: Wish[];
 
   @CreateDateColumn()
@@ -41,7 +36,4 @@ export class Wishlist {
 
   @UpdateDateColumn()
   updatedAt: Date;
-
-  @ManyToOne(() => User, (user) => user.wishes)
-  owner: User;
 }

@@ -1,22 +1,15 @@
-import { IsArray, IsOptional, IsString, Length } from 'class-validator';
-import { IsUrl } from '@nestjs/class-validator';
+import { IsArray, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export class UpdateWishlistDto {
-  @IsString()
-  @Length(0, 250)
   @IsOptional()
-  name: string;
-
   @IsString()
+  name?: string;
+
+  @IsOptional()
   @IsUrl()
-  @IsOptional()
-  image: string;
+  image?: string;
 
+  @IsOptional()
   @IsArray()
-  @IsOptional()
-  itemsId: number[];
-
-  @Length(1, 1500)
-  @IsOptional()
-  description: string;
+  itemsId?: number[];
 }

@@ -1,34 +1,57 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UseFilters } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
-import { UsersService } from '../users/users.service';
-import { User } from '../users/entities/user.entity';
+import { verifyHash } from 'src/common/decorators/helpers/hash';
+import { ErrorCode } from 'src/exceptions/error-codes';
+import { ServerException } from 'src/exceptions/server.exception';
+import { ServerExceptionFilter } from 'src/filter/server-exception.filter';
+import { CreateUserDto } from 'src/users/dto/create-user.dto';
+import { User } from 'src/users/entities/user.entity';
+import { UsersService } from 'src/users/users.service';
 
+@UseFilters(ServerExceptionFilter)
 @Injectable()
 export class AuthService {
   constructor(
-    private jwtService: JwtService,
-    private userService: UsersService,
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
   ) {}
 
-  login(user: User) {
-    const payload = { sub: user.id };
+  async validateUser(username: string, password: string) {
+    try {
+      const user = await this.usersService.findOne({
+        select: { username: true, password: true, id: true },
+        where: { username },
+      });
 
-    return { access_token: this.jwtService.sign(payload, { expiresIn: '7d' }) };
+      if (user && (await verifyHash(password, user.password))) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { password, ...result } = user;
+        return result;
+      }
+    } catch {
+      throw new ServerException(ErrorCode.LoginOrPasswordIncorrect);
+    }
   }
 
-  async validatePassword(username: string, password: string) {
-    const user = await this.userService.getUserByUsername(username);
+  async login(user: User) {
+    const { username, id: userId } = user;
 
-    if (user) {
-      return bcrypt.compare(password, user.password).then((matched) => {
-        if (!matched) {
-          return null;
-        }
-        delete user.password;
-        return user;
-      });
+    return {
+      access_token: await this.jwtService.signAsync({ username, userId }),
+    };
+  }
+
+  async signup(createUserDto: CreateUserDto): Promise<User> {
+    const { username, email } = createUserDto;
+
+    const userExists = await this.usersService.findOne({
+      where: [{ username }, { email }],
+    });
+
+    if (userExists) {
+      throw new ServerException(ErrorCode.UserAlreadyExists);
     }
-    return null;
+
+    return this.usersService.create(createUserDto);
   }
 }

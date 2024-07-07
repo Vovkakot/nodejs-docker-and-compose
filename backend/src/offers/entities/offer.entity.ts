@@ -1,10 +1,11 @@
 import {
-  Column,
-  CreateDateColumn,
   Entity,
-  ManyToOne,
+  Column,
   PrimaryGeneratedColumn,
+  CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Wish } from '../../wishes/entities/wish.entity';
@@ -14,21 +15,17 @@ export class Offer {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({
-    type: 'varchar',
-  })
   @ManyToOne(() => User, (user) => user.offers)
+  @JoinColumn()
   user: User;
 
   @ManyToOne(() => Wish, (wish) => wish.offers)
   item: Wish;
 
-  @Column('decimal', { precision: 10, scale: 2 })
+  @Column({ type: 'decimal', scale: 2 })
   amount: number;
 
-  @Column({
-    default: false,
-  })
+  @Column({ default: false })
   hidden: boolean;
 
   @CreateDateColumn()

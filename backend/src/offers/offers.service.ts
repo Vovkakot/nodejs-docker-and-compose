@@ -1,68 +1,42 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { CreateOfferDto } from './dto/create-offer.dto';
-import { Offer } from './entities/offer.entity';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../users/entities/user.entity';
-import { Wish } from '../wishes/entities/wish.entity';
-import { validate } from 'class-validator';
+import { Repository, FindOneOptions } from 'typeorm';
+import { Offer } from './entities/offer.entity';
+import { CreateOfferDto } from './dto/create-offer.dto';
+import { WishesService } from '../wishes/wishes.service';
+import { UsersService } from 'src/users/users.service';
+
 @Injectable()
 export class OffersService {
   constructor(
     @InjectRepository(Offer)
-    private offerRepository: Repository<Offer>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>,
-    @InjectRepository(Wish)
-    private wishRepository: Repository<Wish>,
+    private readonly offersRepository: Repository<Offer>,
+    private readonly wishesService: WishesService,
+    private readonly usersService: UsersService,
   ) {}
 
-  async create(createOfferDto: CreateOfferDto, userId: number) {
-    const { itemId, amount } = createOfferDto;
-    const offer = await this.validate(createOfferDto);
-    const user = await this.userRepository.findOne({
-      relations: {
-        wishes: true,
-      },
-      where: {
-        id: userId,
-      },
+  async create(createOfferDto: CreateOfferDto, userId: number): Promise<Offer> {
+    const { itemId, hidden, amount } = createOfferDto;
+
+    const user = await this.usersService.findOne({ where: { id: userId } });
+
+    const wish = await this.wishesService.findOne({ where: { id: itemId } });
+
+    const offer = this.offersRepository.create({
+      hidden,
+      user: user,
+      amount,
+      item: wish,
     });
-    const wish = await this.wishRepository.findOneBy({ id: itemId });
-    if (!wish) throw new BadRequestException('Нет подарка с таким id');
-    const isHasWish = user.wishes.some((item) => item.id === wish.id);
-    if (!isHasWish) {
-      offer.user = user;
-      offer.item = wish;
-      wish.raised = Number(wish.raised) + amount;
-      if (wish.raised > wish.price)
-        throw new BadRequestException('Cумма превышает необходимую');
-      await this.wishRepository.save(wish);
-      return this.offerRepository.save(offer);
-    }
-    throw new BadRequestException('На свои подарки не скидываемся');
-  }
-  private async validate(createOfferDto: CreateOfferDto) {
-    const offer = new Offer();
-    for (const key in createOfferDto) {
-      offer[key] = createOfferDto[key];
-    }
-    const errors = await validate(offer, { whitelist: true });
-    if (errors.length > 0) {
-      throw new BadRequestException('Validation failed');
-    }
-    return offer;
-  }
-  findAll() {
-    return this.offerRepository.find({
-      relations: {
-        user: true,
-        item: true,
-      },
-    });
+
+    return this.offersRepository.save(offer);
   }
 
-  findOne(id: number) {
-    return this.offerRepository.findOneBy({ id });
+  async findAll(): Promise<Offer[]> {
+    return this.offersRepository.find();
+  }
+
+  async findOne(query: FindOneOptions<Offer>): Promise<Offer> {
+    return this.offersRepository.findOne(query);
   }
 }
