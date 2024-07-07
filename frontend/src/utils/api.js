@@ -23,7 +23,7 @@ export const registerUser = (userData) => {
   }).then(checkResponse);
 };
 
-export const loginUser = (username, password) => {
+export const loginUser = (email, password) => {
   return fetch(`${URL}/signin/`, {
     method: "POST",
     headers: headersWithContentType,
