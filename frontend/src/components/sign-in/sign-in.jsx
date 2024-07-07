@@ -39,7 +39,7 @@ export const SignIn = ({ extraClass = "" }) => {
     event.preventDefault();
     errorMessage && setErrorMessage("");
     try {
-      const response = await loginUser(userData.username, userData.password);
+      const response = await loginUser(userData.email, userData.password);
       if (response && response.access_token) {
         const user = await getOwnUser();
         setUserCtx(user);
@@ -59,7 +59,7 @@ export const SignIn = ({ extraClass = "" }) => {
       </h2>
       <form className={styles.form} onSubmit={authorizeUser}>
         <Input
-          name={"username"}
+          name={"email"}
           type="text"
           id={1}
           placeholder="Введите имя пользователя"
