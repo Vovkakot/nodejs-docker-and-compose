@@ -1,36 +1,42 @@
 import {
-  Entity,
   Column,
-  PrimaryGeneratedColumn,
   CreateDateColumn,
-  UpdateDateColumn,
+  Entity,
   ManyToOne,
-  JoinColumn,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+import { IsBoolean, IsDate, IsNumber } from 'class-validator';
 import { Wish } from '../../wishes/entities/wish.entity';
+import { User } from '../../users/entities/user.entity';
 
 @Entity()
 export class Offer {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @CreateDateColumn()
+  @IsDate()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  @IsDate()
+  updatedAt: Date;
+
   @ManyToOne(() => User, (user) => user.offers)
-  @JoinColumn()
   user: User;
 
   @ManyToOne(() => Wish, (wish) => wish.offers)
   item: Wish;
 
-  @Column({ type: 'decimal', scale: 2 })
+  @Column({
+    type: 'numeric',
+    scale: 2,
+  })
+  @IsNumber()
   amount: number;
 
   @Column({ default: false })
+  @IsBoolean()
   hidden: boolean;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
 }

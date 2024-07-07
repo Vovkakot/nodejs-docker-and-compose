@@ -1,27 +1,26 @@
-import { UsersService } from 'src/users/users.service';
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { LocalAuthGuard } from './guard/local-auth.guard';
-import { AuthUser } from 'src/common/decorators/user.decorator';
-import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { instanceToPlain } from 'class-transformer';
+import { CreateUserDto } from '../users/dto/create-user.dto';
+import { LocalGuard } from './guards/local.guard';
+import { User } from '../users/entities/user.entity';
 
 @Controller()
 export class AuthController {
   constructor(
-    private readonly authService: AuthService,
-    private readonly usersService: UsersService,
+    private usersService: UsersService,
+    private authService: AuthService,
   ) {}
-
-  @UseGuards(LocalAuthGuard)
-  @Post('signin')
-  login(@AuthUser() user) {
-    return this.authService.login(user);
-  }
 
   @Post('signup')
   async signup(@Body() createUserDto: CreateUserDto) {
-    const user = await this.authService.signup(createUserDto);
-    return instanceToPlain(user);
+    const user = await this.usersService.createUser(createUserDto);
+    return await this.authService.auth(user);
+  }
+
+  @Post('signin')
+  @UseGuards(LocalGuard)
+  async signin(@Req() req: Request & { user: User }) {
+    return this.authService.auth(req.user);
   }
 }

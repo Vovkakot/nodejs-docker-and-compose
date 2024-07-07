@@ -15,19 +15,18 @@ const headersWithAuthorizeFn = () => ({
 });
 
 export const registerUser = (userData) => {
-  const {password,email,about} = userData
   return fetch(`${URL}/signup/`, {
     method: "POST",
     headers: headersWithContentType,
-    body: JSON.stringify({password,email,about}),
+    body: JSON.stringify(userData),
   }).then(checkResponse);
 };
 
-export const loginUser = (email, password) => {
+export const loginUser = (username, password) => {
   return fetch(`${URL}/signin/`, {
     method: "POST",
     headers: headersWithContentType,
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username, password }),
   })
     .then(checkResponse)
     .then((data) => {

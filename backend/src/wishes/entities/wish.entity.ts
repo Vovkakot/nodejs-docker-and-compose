@@ -1,13 +1,21 @@
 import {
-  Entity,
+  IsDate,
+  IsString,
+  Min,
+  Max,
+  IsUrl,
+  IsNumber,
+  IsInt,
+} from 'class-validator';
+import {
   Column,
-  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  Entity,
   ManyToOne,
   OneToMany,
-  CreateDateColumn,
+  PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Length, IsUrl } from 'class-validator';
 import { User } from '../../users/entities/user.entity';
 import { Offer } from '../../offers/entities/offer.entity';
 
@@ -16,39 +24,58 @@ export class Wish {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @CreateDateColumn()
+  @IsDate()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  @IsDate()
+  updatedAt: Date;
+
   @Column()
-  @Length(1, 250)
+  @IsString()
+  @Min(2)
+  @Max(250)
   name: string;
 
   @Column()
+  @IsString()
+  @Min(1)
+  @Max(1024)
+  description: string;
+
+  @Column()
+  @IsUrl()
   link: string;
 
   @Column()
   @IsUrl()
   image: string;
 
-  @Column({ type: 'decimal', scale: 2 })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+  })
+  @IsNumber()
   price: number;
 
-  @Column({ type: 'decimal', scale: 2, default: 0 })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
+  @IsNumber()
   raised: number;
 
   @ManyToOne(() => User, (user) => user.wishes)
   owner: User;
 
-  @Column()
-  @Length(1, 1024)
-  description: string;
-
   @OneToMany(() => Offer, (offer) => offer.item)
-  offers: Offer[];
+  offers: [];
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ default: 0 })
+  @IsInt()
   copied: number;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
 }

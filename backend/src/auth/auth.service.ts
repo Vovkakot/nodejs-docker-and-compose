@@ -1,57 +1,45 @@
-import { Injectable, UseFilters } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { verifyHash } from 'src/common/decorators/helpers/hash';
-import { ErrorCode } from 'src/exceptions/error-codes';
-import { ServerException } from 'src/exceptions/server.exception';
-import { ServerExceptionFilter } from 'src/filter/server-exception.filter';
-import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { User } from 'src/users/entities/user.entity';
+import { Injectable } from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
+import { JwtService } from '@nestjs/jwt';
+import { HashService } from 'src/hash/hash.service';
+import { User } from '../users/entities/user.entity';
 
-@UseFilters(ServerExceptionFilter)
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly hashService: HashService,
   ) {}
 
-  async validateUser(username: string, password: string) {
-    try {
-      const user = await this.usersService.findOne({
-        select: { username: true, password: true, id: true },
-        where: { username },
-      });
-
-      if (user && (await verifyHash(password, user.password))) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { password, ...result } = user;
-        return result;
-      }
-    } catch {
-      throw new ServerException(ErrorCode.LoginOrPasswordIncorrect);
-    }
-  }
-
-  async login(user: User) {
-    const { username, id: userId } = user;
+  async auth(user: User): Promise<any> {
+    const payload = {
+      username: user.username,
+      sub: user.id,
+    };
 
     return {
-      access_token: await this.jwtService.signAsync({ username, userId }),
+      access_token: this.jwtService.sign(payload),
     };
   }
 
-  async signup(createUserDto: CreateUserDto): Promise<User> {
-    const { username, email } = createUserDto;
+  async validatePassword(username: string, password: string): Promise<any> {
+    const user = await this.usersService.findUserByUsername(username);
 
-    const userExists = await this.usersService.findOne({
-      where: [{ username }, { email }],
-    });
+    if (!user) return null;
 
-    if (userExists) {
-      throw new ServerException(ErrorCode.UserAlreadyExists);
+    const verifyPassword = await this.hashService.verifyPassword(
+      password,
+      user.password,
+    );
+
+    if (verifyPassword) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...result } = user;
+
+      return result;
     }
 
-    return this.usersService.create(createUserDto);
+    return null;
   }
 }

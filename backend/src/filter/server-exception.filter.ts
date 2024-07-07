@@ -6,14 +6,15 @@ export class ServerExceptionFilter implements ExceptionFilter {
   catch(exception: ServerException, host: ArgumentsHost) {
     const status = exception.getStatus();
     const message = exception.getResponse();
-    const errorCode = exception.code;
 
-    const response = host.switchToHttp().getResponse();
+    const ctx = host.switchToHttp();
+
+    const response = ctx.getResponse();
 
     response.status(status).json({
-      errorCode,
-      message,
-      status,
+      errorCode: exception,
+      status: status,
+      message: message,
     });
   }
 }

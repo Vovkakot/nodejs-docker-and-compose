@@ -1,84 +1,77 @@
 import {
-  Body,
   Controller,
   Get,
-  Param,
-  Patch,
   Post,
+  Body,
+  Patch,
+  Param,
   UseGuards,
+  Req,
+  UseFilters,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { User } from './entities/user.entity';
-import { WishesService } from 'src/wishes/wishes.service';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { AuthUser } from 'src/common/decorators/user.decorator';
-import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
-import { Like } from 'typeorm';
-import { plainToClass } from 'class-transformer';
-import { UserPublicProfileResponseDto } from './dto/user-public.dto';
-import { WishDto } from 'src/wishes/dto/wish.dto';
+import { JwtGuard } from 'src/auth/guards/auth.guard';
+import { User } from './entities/user.entity';
+import { ServerException } from '../exceptions/server.exception';
+import { ErrorCode } from '../exceptions/error-codes';
+import { ServerExceptionFilter } from '../filter/server-exception.filter';
+import { Wish } from '../wishes/entities/wish.entity';
 
+@UseGuards(JwtGuard)
+@UseFilters(ServerExceptionFilter)
 @Controller('users')
-@UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(
-    private usersService: UsersService,
-    private wishesService: WishesService,
-  ) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @Get('me')
-  async findOwn(@AuthUser() user: User): Promise<User> {
-    return this.usersService.findOne({
-      where: { id: user.id },
-      select: {
-        email: true,
-        username: true,
-        id: true,
-        avatar: true,
-        about: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-  }
+  async getCurrentUser(@Req() req): Promise<User> {
+    const currentUser = await this.usersService.findUserById(req.user.id);
 
-  @Get('me/wishes')
-  async findOwnWishes(@AuthUser() user: User): Promise<WishDto[]> {
-    return this.wishesService.findByUserId(user.id);
+    if (!currentUser) {
+      throw new ServerException(ErrorCode.UserNotFound);
+    }
+
+    return currentUser;
   }
 
   @Patch('me')
-  async updateOne(
-    @AuthUser() user: User,
+  async updateCurrentUserById(
+    @Req() req,
     @Body() updateUserDto: UpdateUserDto,
-  ) {
-    return this.usersService.updateOne({ id: user.id }, updateUserDto);
+  ): Promise<User> {
+    return await this.usersService.updateUserById(req.user.id, updateUserDto);
   }
 
-  @Post('find')
-  async search(@Body('query') query: string): Promise<User[]> {
-    return this.usersService.findMany({
-      where: [{ username: Like(`%${query}%`) }, { email: Like(`%${query}%`) }],
-      select: ['id', 'username', 'about', 'avatar', 'createdAt', 'updatedAt'],
-    });
+  @Get('me/wishes')
+  async findCurrentUserWishes(@Req() req): Promise<Wish[]> {
+    return await this.usersService.findUserWishes(req.user.id);
   }
 
   @Get(':username')
-  async findOne(
-    @Param('username') username: string,
-  ): Promise<UserPublicProfileResponseDto> {
-    const user = this.usersService.findOne({ where: { username } });
-    return plainToClass(UserPublicProfileResponseDto, user, {
-      excludeExtraneousValues: true,
-    });
+  async getUserData(@Param('username') username: string): Promise<User> {
+    const user = await this.usersService.findUserByUsername(username);
+
+    if (!user) {
+      throw new ServerException(ErrorCode.UserNotFound);
+    }
+
+    return user;
   }
 
   @Get(':username/wishes')
-  async getWishes(@Param('username') username: string): Promise<WishDto[]> {
-    const user = await this.usersService.findOne({ where: { username } });
+  async getUserWishes(@Param('username') username: string): Promise<Wish[]> {
+    const user = await this.usersService.findUserByUsername(username);
 
-    return this.usersService.getUserWishes({
-      where: { owner: { id: user.id } },
-    });
+    if (!user) {
+      throw new ServerException(ErrorCode.UserNotFound);
+    }
+
+    return await this.usersService.findUserWishes(user.id);
+  }
+
+  @Post('find')
+  async findUsersByQuery(@Body('query') query: string): Promise<User[]> {
+    return await this.usersService.findMany(query);
   }
 }

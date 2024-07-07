@@ -1,100 +1,113 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
-  FindManyOptions,
-  FindOneOptions,
-  Repository,
-  FindOptionsWhere,
-} from 'typeorm';
-import { InjectRepository } from '@nestjs/typeorm';
-import { User } from './entities/user.entity';
+import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { hashValue } from 'src/common/decorators/helpers/hash';
-import { Wish } from 'src/wishes/entities/wish.entity';
-import { WishDto } from 'src/wishes/dto/wish.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Wish } from '../wishes/entities/wish.entity';
+import { User } from './entities/user.entity';
+import { Like, Repository } from 'typeorm';
+import { HashService } from '../hash/hash.service';
+import { ServerException } from '../exceptions/server.exception';
+import { ErrorCode } from '../exceptions/error-codes';
 
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectRepository(User) private usersRepository: Repository<User>,
-    @InjectRepository(Wish) private wishesRepository: Repository<Wish>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
+    @InjectRepository(Wish)
+    private readonly wishesRepository: Repository<Wish>,
+    private readonly hashService: HashService,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    const { password } = createUserDto;
-    const user = await this.usersRepository.create({
+  async createUser(createUserDto: CreateUserDto): Promise<User> {
+    const isUserAlreadyExists = await this.usersRepository.findBy([
+      { username: createUserDto.username },
+      { email: createUserDto.email },
+    ]);
+
+    if (isUserAlreadyExists.length > 0) {
+      throw new ServerException(ErrorCode.UserAlreadyExists);
+    }
+
+    return this.usersRepository.save({
       ...createUserDto,
-      password: await hashValue(password),
+      password: await this.hashService.hashPassword(createUserDto.password),
     });
-
-    return this.usersRepository.save(user);
   }
 
-  async findById(id: number): Promise<User> {
-    const user = await this.usersRepository.findOneBy({ id });
-    return user;
+  async findUserByUsername(username: string): Promise<User> {
+    return await this.usersRepository.findOneBy({ username });
   }
 
-  async findOne(query: FindOneOptions<User>) {
-    return this.usersRepository.findOne(query);
+  async findUserByEmail(email: string): Promise<User> {
+    return await this.usersRepository.findOneBy({ email });
   }
 
-  async findMany(query: FindManyOptions<User>) {
-    return this.usersRepository.find(query);
+  async findUserById(id: number): Promise<User> {
+    return await this.usersRepository.findOneBy({ id });
   }
 
-  async updateOne(query: FindOptionsWhere<User>, updateUserDto: UpdateUserDto) {
-    const { password, email, username } = updateUserDto;
-    const { id } = query;
-    const user = await this.findById(id as number);
-    if (email) {
-      const existingUserByEmail = await this.usersRepository.findOne({
-        where: { email },
-      });
+  async updateUserById(
+    id: number,
+    updateUserDto: UpdateUserDto,
+  ): Promise<User> {
+    const user = await this.findUserById(id);
 
-      if (existingUserByEmail && existingUserByEmail.id !== id) {
-        throw new ConflictException(
-          'Пользователь с таким email уже существует',
-        );
+    if (updateUserDto.email && updateUserDto.email !== user.email) {
+      const emailMatches = await this.findUserByEmail(updateUserDto.email);
+
+      if (emailMatches) {
+        throw new ServerException(ErrorCode.UserAlreadyExists);
       }
     }
 
-    if (username) {
-      const existingUserByUsername = await this.usersRepository.findOne({
-        where: { username },
-      });
-
-      if (existingUserByUsername && existingUserByUsername.id !== id) {
-        throw new ConflictException(
-          'Пользователь с таким именем уже существует',
-        );
+    if (updateUserDto.username && updateUserDto.username !== user.username) {
+      const usernameMatches = await this.findUserByUsername(
+        updateUserDto.username,
+      );
+      if (usernameMatches) {
+        throw new ServerException(ErrorCode.UserAlreadyExists);
       }
     }
-    if (password) {
-      updateUserDto.password = await hashValue(password);
+
+    if (updateUserDto.password) {
+      updateUserDto.password = await this.hashService.hashPassword(
+        updateUserDto.password,
+      );
     }
-    const updatedUser = await this.usersRepository.save({
+
+    const newUserData: User = {
       ...user,
-      ...updateUserDto,
+      password: updateUserDto?.password,
+      email: updateUserDto?.email,
+      about: updateUserDto?.about,
+      username: updateUserDto?.username,
+      avatar: updateUserDto?.avatar,
+    };
+
+    await this.usersRepository.update(user.id, newUserData);
+
+    return await this.findUserById(id);
+  }
+
+  async findUserWishes(id: number): Promise<Wish[]> {
+    return this.wishesRepository.find({
+      where: { owner: { id } },
+      relationLoadStrategy: 'join',
+      relations: [
+        'owner',
+        'offers',
+        'offers.user',
+        'offers.user.wishes',
+        'offers.user.offers',
+        'offers.user.wishlists',
+      ],
     });
-    return updatedUser;
   }
 
-  async removeOne(query: FindOptionsWhere<User>) {
-    const user = await this.usersRepository.findOne({ where: query });
-    if (!user) {
-      throw new NotFoundException('Пользователь не найден');
-    }
-
-    await this.usersRepository.delete(query);
-  }
-
-  async getUserWishes(query: FindManyOptions<WishDto>): Promise<WishDto[]> {
-    const wishes = await this.wishesRepository.find(query);
-    return wishes;
+  async findMany(query: string): Promise<User[]> {
+    return await this.usersRepository.find({
+      where: [{ username: Like(`${query}%`) }, { email: Like(`${query}%`) }],
+    });
   }
 }

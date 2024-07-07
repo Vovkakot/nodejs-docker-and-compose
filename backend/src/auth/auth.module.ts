@@ -1,26 +1,30 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
-import { UsersModule } from 'src/users/users.module';
-import { AuthController } from './auth.controller';
+import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LocalStrategy } from './strategy/local.strategy';
-import { JwtStrategy } from './strategy/jwt.strategy';
-import { JwtConfigFactory } from 'src/config/jwt-config.factory';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from 'src/users/entities/user.entity';
+import { AuthController } from './auth.controller';
+import { HashModule } from '../hash/hash.module';
+import { UsersModule } from '../users/users.module';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtStrategy } from './strategies/jwt.strategies';
+import { LocalStrategy } from './strategies/local.stategies';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
-    forwardRef(() => UsersModule),
+    HashModule,
+    UsersModule,
     PassportModule,
+    ConfigModule,
     JwtModule.registerAsync({
-      useClass: JwtConfigFactory,
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET') || 'jwt-secret',
+      }),
+      inject: [ConfigService],
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy, JwtConfigFactory],
+  providers: [AuthService, JwtStrategy, LocalStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}

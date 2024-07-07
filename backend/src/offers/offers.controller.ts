@@ -1,60 +1,38 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
-  UseGuards,
-  BadRequestException,
-  Get,
   Param,
+  UseGuards,
+  Req,
+  UseFilters,
 } from '@nestjs/common';
 import { OffersService } from './offers.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
-import { AuthUser } from 'src/common/decorators/user.decorator';
-import { User } from '../users/entities/user.entity';
-import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
-import { WishesService } from 'src/wishes/wishes.service';
+import { JwtGuard } from 'src/auth/guards/auth.guard';
 import { Offer } from './entities/offer.entity';
+import { ServerExceptionFilter } from '../filter/server-exception.filter';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtGuard)
+@UseFilters(ServerExceptionFilter)
 @Controller('offers')
 export class OffersController {
-  constructor(
-    private readonly offersService: OffersService,
-    private readonly wishesService: WishesService,
-  ) {}
+  constructor(private readonly offersService: OffersService) {}
 
   @Post()
-  async create(@Body() createOfferDto: CreateOfferDto, @AuthUser() user: User) {
-    const { amount } = createOfferDto;
-    const wish = await this.wishesService.findOne({
-      where: { id: createOfferDto.itemId },
-      relations: ['owner', 'offers', 'offers.user'],
-    });
-
-    if (user.id === wish.owner.id) {
-      throw new BadRequestException('Нельзя скинуться на собственные подарки');
-    }
-
-    const raisedSum = Number(wish.raised) + Number(amount);
-    if (raisedSum > Number(wish.price)) {
-      throw new BadRequestException('На этот подарок уже собраны деньги');
-    }
-
-    const offer = await this.offersService.create(createOfferDto, user.id);
-    await this.wishesService.updateRaisedAmount(
-      createOfferDto.itemId,
-      +createOfferDto.amount,
-    );
-    return offer;
+  async createOffer(@Req() req, @Body() createOfferDto: CreateOfferDto) {
+    const user = req.user;
+    return this.offersService.createOffer(createOfferDto, user);
   }
 
   @Get()
-  async findAll(): Promise<Offer[]> {
-    return this.offersService.findAll();
+  async findAllOffers(): Promise<Offer[]> {
+    return this.offersService.findAllOffers();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string): Promise<Offer> {
-    return this.offersService.findOne({ where: { id: +id } });
+  findOneOffer(@Param('id') id: string): Promise<Offer> {
+    return this.offersService.findOneOffer(Number(id));
   }
 }
