@@ -78,7 +78,7 @@ export const SignUp = ({ extraClass = "" }) => {
 
       try {
         const { access_token } = await loginUser(
-          userData.username,
+          userData.email,
           userData.password
         );
         if (access_token) {

@@ -15,10 +15,11 @@ const headersWithAuthorizeFn = () => ({
 });
 
 export const registerUser = (userData) => {
+  const {password,email,about} = userData
   return fetch(`${URL}/signup/`, {
     method: "POST",
     headers: headersWithContentType,
-    body: JSON.stringify(userData),
+    body: JSON.stringify({password,email,about}),
   }).then(checkResponse);
 };
 
@@ -26,7 +27,7 @@ export const loginUser = (username, password) => {
   return fetch(`${URL}/signin/`, {
     method: "POST",
     headers: headersWithContentType,
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email, password }),
   })
     .then(checkResponse)
     .then((data) => {
